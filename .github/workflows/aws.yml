@@ -29,23 +29,18 @@ jobs:
       run: |
         npm run build
 
-    - name: Set up AWS CLI
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::872515272906:oidc-provider/token.actions.githubusercontent.com
-        role-session-name: GitHubActions
-        aws-region: ap-south-1
-
-    - name: Upload Build to S3
+    - name: Set up SSH
       run: |
-        aws s3 cp ./build s3://react-vite-bucket/ --recursive
+        mkdir -p ~/.ssh
+        echo "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -t rsa 13.232.218.212 >> ~/.ssh/known_hosts
 
-    - name: Deploy React app using SSM
+    - name: Deploy React app via SSH
       run: |
-        aws ssm send-command \
-          --document-name "AWS-RunShellScript" \
-          --targets "Key=instanceIds,Values=i-0460faff787bbbaa3" \
-          --parameters 'commands=["aws s3 cp s3://react-vite-bucket/build/ /var/www/html/ --recursive","sudo systemctl restart nginx"]' \
-          --comment "Deploy React app" \
-          --region ap-south-1
-    
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ec2-user@13.232.218.212 << EOF
+          sudo mkdir -p /var/www/html
+          sudo rm -rf /var/www/html/*
+          sudo cp -r ./build/* /var/www/html/
+          sudo systemctl restart nginx
+        EOF
