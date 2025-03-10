@@ -1,0 +1,51 @@
+name: Deploy to Amazon EC2
+
+on:
+  push:
+    branches: [ "master" ]
+    
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+  
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install
+
+    - name: Build React app
+      run: |
+        npm run build
+
+    - name: Set up AWS CLI
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::872515272906:role/github-oidc-s3-role
+        role-session-name: GitHubActions
+        aws-region: ap-south-1
+
+    - name: Upload Build to S3
+      run: |
+        aws s3 cp ./build s3://react-vite-bucket/ --recursive
+
+    - name: Deploy React app using SSM
+      run: |
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "Key=instanceIds,Values=i-0460faff787bbbaa3" \
+          --parameters 'commands=["aws s3 cp s3://react-vite-bucket/build/ /var/www/html/ --recursive","sudo systemctl restart nginx"]' \
+          --comment "Deploy React app" \
+          --region ap-south-1
+    
