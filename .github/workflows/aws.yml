@@ -42,11 +42,6 @@ jobs:
 
     - name: Deploy React app using SSM
       run: |
-        # Create the tarball of the build folder
-        tar -czf build.tar.gz -C build .
-
-    - name: Deploy React app using SSM
-      run: |
         aws ssm send-command \
           --document-name "AWS-RunShellScript" \
           --targets "Key=instanceIds,Values=i-0460faff787bbbaa3" \
